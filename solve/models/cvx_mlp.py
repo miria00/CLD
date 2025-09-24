@@ -14,42 +14,50 @@ class Convex_MLP(ABC):
         self.ytst = None
     
     @abstractmethod
-    def init_model(self, seed):
+    def init_model(self):
         pass
     
     @abstractmethod
-    def matvec_Fi(self, vec):
-      pass
-    
-    @abstractmethod
-    def rmatvec_Fi(self, vec):
-      pass
-    
-    @abstractmethod
-    def matvec_Gi(self, vec):
-      pass
-    
-    @abstractmethod
-    def rmatvec_Gi(self, vecs):
-      pass
+    def rmatvec_Fi(self, i, vec):
+        pass
 
     @abstractmethod
     def matvec_F(self, vec):
         pass
+    
+    @abstractmethod 
+    def batch_matvec_F(self, vecs):
+      pass
 
     @abstractmethod
     def rmatvec_F(self, vec):
         pass
-
+    
+    @abstractmethod
+    def batch_rmatvec_F(self, vecs):
+      pass
+    
     @abstractmethod
     def matvec_G(self, vec):
         pass
+    
+    @abstractmethod
+    def batch_matvec_G(self, vecs):
+      pass
 
     @abstractmethod
     def rmatvec_G(self, vec):
         pass
+    
+    @abstractmethod
+    def batch_rmatvec_G(self,vecs):
+      pass
 
     @abstractmethod
     def matvec_A(self, vec):
-        pass
+         pass
+    
+    @abstractmethod
+    def batch_matvec_A(self, vecs):
+      pass
 
