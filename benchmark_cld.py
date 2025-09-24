@@ -6,6 +6,8 @@ from transformers import WhisperProcessor
 import evaluate
 import wandb
 
+# time benchmarking
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate Whisper model on a dataset for language detection and transcription.")
     parser.add_argument("--dataset_path", type=str, required=True, help="Path to the dataset directory (e.g., 'data/en_hi/').")
