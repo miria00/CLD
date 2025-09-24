@@ -1,0 +1,31 @@
+{
+    "name": "hi vs ms (Common Voice) binary dataset",
+    "languages": {
+        "hi": {
+            "accents": [
+                {
+                    "code": "hi",
+                    "column_name": "",
+                    "dataset": "common_voice"
+                }
+            ]
+        },
+        "ms": {
+            "accents": [
+                {
+                    "code": "ms",
+                    "column_name": "",
+                    "dataset": "common_voice"
+                }
+            ]
+        }
+    },
+    "params": {
+        "samples_per_class": 100,
+        "split": {
+            "train": 0.8,
+            "val": 0.1,
+            "test": 0.1
+        }
+    }
+}
