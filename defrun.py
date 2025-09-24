@@ -59,7 +59,8 @@ def run(model_name, data_dir, cronos_params, adamW_params, opt_seed, data_seed, 
     num_neurons = cronos_params.get('P_S', 10)
     
     # Create the convex neural network model
-    model = CVX_ReLU_MLP(Atr, ytr, 2, num_neurons, cronos_params['beta'], cronos_params['rho'], jax.random.PRNGKey(0))
+    num_classes = len(set(ytr))
+    model = CVX_ReLU_MLP(Atr, ytr, num_classes, num_neurons, cronos_params['beta'], cronos_params['rho'], jax.random.PRNGKey(0))
     model.init_model()
     model.Xtst = Atst
     model.ytst = ytst
