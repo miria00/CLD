@@ -117,7 +117,7 @@ def load_data(dataset_path: str, target_lang: str = None, caller_script: str = N
     A = A[perm]
     y = y[perm]
 
-    return A, y
+    return A, y, len(classes)
     
     # Split logic
     # if caller_script == "defrun":
