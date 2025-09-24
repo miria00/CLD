@@ -5,7 +5,7 @@ set -euo pipefail
 # Configuration
 CONFIG_PATH="configs/cdo_hi_ms_config.json"
 OUT_DIR="data/cdo_hi_ms"
-COMMON_VOICE_DIR="data/cv/"
+COMMON_VOICE_DIR="../CLD/data/cv-corpus-22.0-2025-06-20/"
 MUSAN_DIR="musan/noise/free-sound"
 
 # Ingest data
