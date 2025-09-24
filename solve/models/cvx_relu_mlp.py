@@ -7,24 +7,23 @@ from jax.nn import relu
 from jax import jit, tree_util, vmap
 
 class CVX_ReLU_MLP(Convex_MLP):
-    def __init__(self, X, y, P_S, beta, rho, seed, d_diags = None, e_diags = None):
-        super().__init__(X, y, P_S, beta, rho, seed)
-        self.d_diags = d_diags
-        self.e_diags = e_diags
-        # Add these attributes to store the weights and ADMM solution
-        self.theta1 = None  # First layer weights (W1)
-        self.theta2 = None  # Second layer weights (w2)
-        self.u = None       # ADMM solution variable u
-        self.v = None       # ADMM solution variable v
-        self.s = None       # ADMM solution variable s
-    # def __init__(self, X, y, n_classes, P_S, beta, rho, seed,
-    # d_diags = None, e_diags = None, Xtst = None, ytst = None):
+    # def __init__(self, X, y, P_S, beta, rho, seed, d_diags = None, e_diags = None):
     #     super().__init__(X, y, P_S, beta, rho, seed)
-    #     self.n_classes = n_classes
     #     self.d_diags = d_diags
     #     self.e_diags = e_diags
-    #     self.Xtst = Xtst
-    #     self.ytst = ytst
+    #     # Add these attributes to store the weights and ADMM solution
+    #     self.theta1 = None  # First layer weights (W1)
+    #     self.theta2 = None  # Second layer weights (w2)
+    #     self.u = None       # ADMM solution variable u
+    #     self.v = None       # ADMM solution variable v
+    #     self.s = None       # ADMM solution variable s
+    def __init__(self, X, y, n_classes, P_S, beta, rho, seed,d_diags = None, e_diags = None, Xtst = None, ytst = None):
+        super().__init__(X, y, P_S, beta, rho, seed)
+        self.n_classes = n_classes
+        self.d_diags = d_diags
+        self.e_diags = e_diags
+        self.Xtst = Xtst
+        self.ytst = ytst
 
     def init_model(self):
         from ..utils.model_utils import get_hyperplane_cuts
