@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 import jax.random as jrn
-from jax import jit, lax
+from jax import jit, lax, vmap
 from jax.scipy.linalg import solve_triangular
 from ..utils.linops_utils import tensor_to_vec, vec_to_tensor
 from typing import NamedTuple
@@ -13,22 +13,20 @@ class Nys_Precond(NamedTuple):
             d: float
             rho: float
             P_S: int
-            mod_type: str
             
             @jit
-            def apply(self, u):
+            def apply(self,u):
                 u = tensor_to_vec(u)
                 Utu = self.U.T @ u
-                u = (self.S[-1] + self.rho) * (self.U @ (Utu / (self.S + self.rho))) + u - self.U @ Utu    
-                if self.mod_type == 'CReLU':
-                     out = vec_to_tensor(u, self.d, self.P_S)
-                elif self.mod_type == 'CGReLU':
-                     out = u.reshape((self.d, self.P_S))
-                return out            
+                u = (self.S[-1] + self.rho) * (self.U @ (Utu / (self.S + self.rho))) + u - self.U @ Utu
+                return vec_to_tensor(u, self.d, self.P_S)
+            
+            def batch_apply(self,u_s):
+              return vmap(self.apply)(u_s)
             
             def _tree_flatten(self):
                 children = (self.U, self.S)  # arrays / dynamic values
-                aux_data = {'d': self.d, 'rho': self.rho,'P_S': self.P_S, 'mod_type': self.mod_type}  # static values
+                aux_data = {'d': self.d, 'rho': self.rho,'P_S': self.P_S}  # static values
                 return (children, aux_data)
     
             @classmethod
@@ -40,7 +38,7 @@ tree_util.register_pytree_node(Nys_Precond,
                                 Nys_Precond._tree_unflatten)
 
 
-def rand_nys_appx(model, rank: int, mod_class: str,  key): #-> Tuple[jnp.ndarray, jnp.ndarray]:
+def rand_nys_appx(model, rank: int, key): #-> Tuple[jnp.ndarray, jnp.ndarray]:
     """
     Computes the Nystrom approximation via sketch A.T@(A@Omega) following Tropp et al. 2017
     Uses linops to compute Y from A; memory efficient
@@ -62,23 +60,16 @@ def rand_nys_appx(model, rank: int, mod_class: str,  key): #-> Tuple[jnp.ndarray
         second preconditioning matrix
     """
     d = model.X.shape[1]
-    if mod_class == 'CReLU':
-      N = 2 * d * model.P_S
-      # Define a function to compute the sketch for a single column
-      def compute_sketch(col):
-        col_tensor = vec_to_tensor(col, d, model.P_S)
-        col_A = model.matvec_A(col_tensor)
-        return tensor_to_vec(col_A) 
-    else:
-      N = d * model.P_S
-      def compute_sketch(col):
-        col_tensor = col.reshape(d, model.P_S)
-        col_A = model.matvec_A0(col_tensor)
-        return jnp.reshape(col_A, (-1,))
-         
+    N = 2 * model.P_S * d
     key,subkey = jrn.split(key)
     Omega = jrn.normal(subkey, (N, rank))  # Generate test matrix
     Omega = jnp.linalg.qr(Omega)[0]
+
+    # Define a function to compute the sketch for a single column
+    def compute_sketch(col):
+        col_tensor = vec_to_tensor(col, d, model.P_S)
+        col_A = model.matvec_A(col_tensor)
+        return tensor_to_vec(col_A)
 
     # Vectorize the function over all columns
     compute_sketch_vmap = jax.vmap(compute_sketch)

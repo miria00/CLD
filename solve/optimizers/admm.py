@@ -1,15 +1,11 @@
 import jax 
 import jax.numpy as jnp
-from jax import jit
-from .pcg import pcg
-from ..preconditioner.nystrom import Nys_Precond, rand_nys_appx
-from ..utils.metric_utils import mse, compute_bin_acc
-from ..utils.model_utils import optimal_weights_transform
-from ..utils.proximal_utils import proxl2_tensor
-#from functools import partial
-from time import perf_counter
+from ..optimizers.pcg import pcg
+from ..preconditioner.nystrom import Nys_Precond,rand_nys_appx
+from ..utils.metric_utils import mse, classification_accuracy
+from ..utils.proximal_utils import batch_proxl2_tensor
 
-def admm(model, admm_params):
+def admm(model,admm_params):
     rank = admm_params['rank']
     beta = admm_params['beta']
     gamma_ratio = admm_params['gamma_ratio']
@@ -53,8 +49,6 @@ def admm(model, admm_params):
         # u update
         b = b_1 + v - lam + model.batch_rmatvec_G(s-nu)
         u ,_ , _ = pcg(b, model, Mnys, pcg_iters)
-
-        from utils import batch_proxl2_tensor
 
         # updates on v = (v1...vP, w1...wP) via prox operator
         v = v.at[:, 0, :].set(batch_proxl2_tensor(u[:, 0, :]+lam[:, 0, :], beta = beta, gamma = 1/model.rho))

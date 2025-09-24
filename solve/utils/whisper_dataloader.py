@@ -14,7 +14,7 @@ import torchaudio
 from typing import Tuple
 import os
 
-def load_data(dataset_path: str, target_lang: str = 'en', caller_script: str = None, data_seed: int = 42, dataset_split: str = "train") -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, int, int]:
+def load_data(dataset_path: str, target_lang: str = None, caller_script: str = None, data_seed: int = 42, dataset_split: str = "train") -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, int, int]:
     """
     Load HF dataset, extract pooled Whisper hidden states, return train/test splits.
     
@@ -83,12 +83,21 @@ def load_data(dataset_path: str, target_lang: str = 'en', caller_script: str = N
     features = []
     labels = []
     valid_count = 0
+
+    classes = set(sample['lang'] for sample in train_data)
+    classes_mapping = {lang: i for i, lang in enumerate(sorted(classes))}
     for sample in train_data:
         hidden = extract_pooled_hidden(sample['audio'])
         if hidden is None:
             continue  # Skip invalid audio
         
-        label = 1.0 if sample['lang'] == target_lang else -1.0
+        if len(classes) == 2:
+            # binary
+            label = 1.0 if sample['lang'] == target_lang else -1.0
+        else:
+            # multiclass
+            label = classes_mapping[sample['lang']]
+
         features.append(hidden)
         labels.append(label)
         valid_count += 1
@@ -96,7 +105,7 @@ def load_data(dataset_path: str, target_lang: str = 'en', caller_script: str = N
     if valid_count == 0:
         raise ValueError("No valid audio samples found")
     
-    print(f"Extracted {valid_count} valid samples: {np.sum(np.array(labels) == 1)} POS, {np.sum(np.array(labels) == -1)} NEG")
+    # print(f"Extracted {valid_count} valid samples: {np.sum(np.array(labels) == 1)} POS, {np.sum(np.array(labels) == -1)} NEG")
     
     # To JAX
     A = jnp.array(features)  # (n, 768)
