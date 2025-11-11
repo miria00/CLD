@@ -63,6 +63,10 @@ def build_predict_lang_fn(target_lang: str, languages: Sequence[str]):
     other_lang = languages[1] if languages[0] == target_lang else languages[0]
 
     def _predict_lang(model: Any, X_val: np.ndarray) -> Sequence[str]:
+        pooled = X_val.mean(dim=1).cpu().detach().numpy()  # Move to CPU and numpy for predict
+        logits = model.predict(pooled, model.lang_detect_head.theta1, model.lang_detect_head.theta2)
+        return [str(target_lang) if x > 0 else str(other_lang) for x in logits]
+
         # Ensure weights exist (ADMM updates these each iter)
         if getattr(model, "theta1", None) is None or getattr(model, "theta2", None) is None:
             # Fallback: predict target for all until weights available
