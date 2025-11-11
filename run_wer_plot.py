@@ -45,11 +45,12 @@ def make_decode_fn(model_name: str):
             arr = np.asarray(audio)
             sr = 16000
 
-        inputs = processor(arr, sampling_rate=sr, return_tensors="pt").to(device)
+        inputs = processor(arr, sampling_rate=sr, return_tensors="pt")
+        input_features = inputs.input_features.to(device=device, dtype=model.dtype)
         forced_ids = processor.get_decoder_prompt_ids(language=language, task="transcribe")
         with torch.no_grad():
             pred_ids = model.generate(
-                inputs.input_features,
+                input_features,
                 forced_decoder_ids=forced_ids,
             )
         text = processor.batch_decode(pred_ids, skip_special_tokens=True)[0]
