@@ -9,7 +9,7 @@ from ..utils.proximal_utils import proxl2_tensor
 #from functools import partial
 from time import perf_counter
 
-def admm(model, admm_params):
+def admm(model, admm_params, callback=None):
     rank = admm_params['rank']
     beta = admm_params['beta']
     gamma_ratio = admm_params['gamma_ratio']
@@ -83,7 +83,7 @@ def admm(model, admm_params):
            metrics['val_acc'].append(compute_bin_acc(y_hat_val,model.ytst))
            print(metrics['val_acc'])
     
-    for _ in range(admm_iters):
+    for k in range(admm_iters):
         start = perf_counter()
         u, v, s, lam, nu, Gu = _admm_step(u, v, s, lam, nu)
         
@@ -103,6 +103,17 @@ def admm(model, admm_params):
            metrics['train_acc'].append(compute_bin_acc(y_hat,model.y))
            metrics['val_acc'].append(compute_bin_acc(y_hat_val,model.ytst))
            print(metrics['val_acc'])
+        
+        # Expose intermediate weights for external callbacks (e.g., WER per-iter)
+        W1_iter, w2_iter = optimal_weights_transform(u[0], u[1], model.P_S, d)
+        model.theta1 = W1_iter
+        model.theta2 = w2_iter
+        if callback is not None:
+            try:
+                callback({"iter": k + 1})
+            except Exception:
+                # Callback errors should not crash optimization
+                pass
 
     # Save the ADMM solution in the model
     model.u = u
