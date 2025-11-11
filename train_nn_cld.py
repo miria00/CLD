@@ -27,6 +27,8 @@ import torchaudio
 import torch
 import numpy as np
 import torch.nn as nn
+import evaluate
+import wandb
 
 from datasets import load_from_disk, Audio, DatasetDict
 from transformers import (
@@ -34,6 +36,8 @@ from transformers import (
     WhisperModel,
     TrainingArguments,
     Trainer,
+    TrainerCallback,
+    WhisperForConditionalGeneration,
 )
 from sklearn.metrics import accuracy_score
 
@@ -113,24 +117,25 @@ def parse_args():
         choices=["wandb", "none"],
         help="Where to report logs (wandb or none).",
     )
+    parser.add_argument(
+        "--whisper_path",
+        type=str,
+        default="openai/whisper-small",
+        help="Checkpoint for generative Whisper to decode transcripts.",
+    )
+    parser.add_argument(
+        "--wer_max_samples",
+        type=int,
+        default=128,
+        help="Max eval samples for WER per epoch (to limit decoding cost).",
+    )
+    parser.add_argument(
+        "--wer_batch_size",
+        type=int,
+        default=8,
+        help="Batch size for WER decoding.",
+    )
     return parser.parse_args()
-
-
-def subsample_larger_class(dataset, lang1, lang2, label_col="labels"):
-    """Subsample the larger class to match the size of the smaller class."""
-    lang1_indices = [i for i, ex in enumerate(dataset) if ex[label_col] == 0]
-    lang2_indices = [i for i, ex in enumerate(dataset) if ex[label_col] == 1]
-    n_lang1 = len(lang1_indices)
-    n_lang2 = len(lang2_indices)
-    min_size = min(n_lang1, n_lang2)
-    if n_lang1 > min_size:
-        # Subsample lang1
-        lang1_indices = np.random.choice(lang1_indices, min_size, replace=False)
-    if n_lang2 > min_size:
-        # Subsample lang2
-        lang2_indices = np.random.choice(lang2_indices, min_size, replace=False)
-    selected_indices = sorted(lang1_indices + lang2_indices)
-    return dataset.select(selected_indices)
 
 
 def main():
@@ -156,6 +161,10 @@ def main():
     for split_name in ["train", "valid", "test"]:
         if split_name in raw_datasets:
             raw_datasets[split_name] = raw_datasets[split_name].filter(filter_lang)
+
+    # Keep a copy of evaluation data with audio/text/lang intact for WER
+    eval_audio_ds = raw_datasets["valid"] if "valid" in raw_datasets else raw_datasets["test"]
+    eval_audio_ds = eval_audio_ds.cast_column("audio", audio_feature)
 
     # Print dataset sizes
     print("\n=== Dataset Size Summary ===")
@@ -302,6 +311,88 @@ def main():
           f"  fp16 = {args.fp16}\n" +
           f"  report_to = {args.report_to}\n")
 
+    # Prepare generative Whisper and WER metric for per-epoch evaluation
+    try:
+        gen_processor = WhisperProcessor.from_pretrained(args.whisper_path)
+        gen_model = WhisperForConditionalGeneration.from_pretrained(
+            args.whisper_path,
+            device_map="auto" if torch.cuda.is_available() else None,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        )
+    except Exception:
+        gen_processor = WhisperProcessor.from_pretrained("openai/whisper-small")
+        gen_model = WhisperForConditionalGeneration.from_pretrained(
+            "openai/whisper-small",
+            device_map="auto" if torch.cuda.is_available() else None,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        )
+    gen_model.config.forced_decoder_ids = None
+    wer_metric = evaluate.load("wer")
+
+    class WERCallback(TrainerCallback):
+        def __init__(self, processor, gen_model, eval_ds, lang1, lang2, batch_size, max_samples):
+            self.proc = processor
+            self.gen_model = gen_model
+            self.eval_ds = eval_ds
+            self.lang1 = lang1
+            self.lang2 = lang2
+            self.batch_size = batch_size
+            self.max_samples = max_samples
+
+        def on_epoch_end(self, args, state, control, model=None, **kwargs):
+            device = next(model.parameters()).device
+            g_first_param = next(self.gen_model.parameters())
+            g_device = g_first_param.device
+
+            n = len(self.eval_ds)
+            if n == 0:
+                return
+            use_n = min(n, self.max_samples)
+            indices = list(range(use_n))
+
+            pred_texts = []
+            ref_texts = []
+
+            self.gen_model.eval()
+            model.eval()
+            with torch.no_grad():
+                for start in range(0, use_n, self.batch_size):
+                    end = min(use_n, start + self.batch_size)
+                    batch = [self.eval_ds[i] for i in indices[start:end]]
+                    audio_list = [b["audio"]["array"] for b in batch]
+                    refs = [b["text"] for b in batch]
+                    # Build input_features once for both classifier and generative model
+                    inputs = self.proc(audio_list, sampling_rate=TARGET_SR, return_tensors="pt")
+                    input_features = inputs.input_features.to(device)
+                    # Language prediction (0 -> lang1, 1 -> lang2)
+                    logits = model(input_features=input_features)["logits"]
+                    preds = torch.argmax(logits, dim=-1).tolist()
+                    pred_langs = [self.lang1 if p == 0 else self.lang2 for p in preds]
+                    # Decode transcripts with forced language prompts
+                    gen_feats = inputs.input_features.to(g_device, dtype=g_first_param.dtype)
+                    forced_ids = [
+                        self.proc.get_decoder_prompt_ids(language=pl, task="transcribe")
+                        for pl in pred_langs
+                    ]
+                    # Generate per-sample to support different forced ids
+                    texts = []
+                    for i in range(gen_feats.size(0)):
+                        out_ids = self.gen_model.generate(
+                            gen_feats[i:i+1],
+                            forced_decoder_ids=forced_ids[i],
+                        )
+                        text = self.proc.batch_decode(out_ids, skip_special_tokens=True)[0]
+                        texts.append(text)
+                    pred_texts.extend(texts)
+                    ref_texts.extend(refs)
+
+            wer = 100.0 * wer_metric.compute(predictions=pred_texts, references=ref_texts)
+            try:
+                wandb.log({"eval/wer": wer, "eval/wer_samples": use_n, "epoch": state.epoch})
+            except Exception:
+                pass
+            print(f"[WERCallback] Epoch {state.epoch:.0f} WER: {wer:.2f}% on {use_n} samples")
+
     # 9) Instantiate Trainer
     trainer = Trainer(
         model=model,
@@ -309,6 +400,7 @@ def main():
         train_dataset=raw_datasets["train"],
         eval_dataset=raw_datasets["evaluation"],
         compute_metrics=compute_metrics,
+        callbacks=[WERCallback(gen_processor, gen_model, eval_audio_ds, args.lang1, args.lang2, args.wer_batch_size, args.wer_max_samples)],
     )
 
     print("[Info] Starting training …")
