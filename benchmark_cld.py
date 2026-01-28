@@ -22,6 +22,7 @@ def parse_args():
     parser.add_argument("--languages", type=str, required=True, help="Comma-separated list of languages to evaluate on")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size for inference.")
     parser.add_argument("--no_wandb", action="store_true", help="Disable Weights & Biases logging")
+    parser.add_argument("--debug_infer", action="store_true", help="Enable verbose inference logging (also supports env CLD_DEBUG_INFER=1)")
     return parser.parse_args()
 
 def main():
@@ -37,7 +38,10 @@ def main():
 
     ds = load_from_disk(args.dataset_path)
 
-    asr_model = ASRModel.from_pretrained(args.model_name, config={"languages": args.languages.split(",")})
+    asr_model = ASRModel.from_pretrained(
+        args.model_name,
+        config={"languages": args.languages.split(","), "debug_infer": bool(args.debug_infer)},
+    )
     lang_detect_head = None
     if args.cld_type == 'nn':
         lang_detect_head = NNLangDetectHead.load(args.cld_path, asr_model)

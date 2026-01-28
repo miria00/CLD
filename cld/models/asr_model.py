@@ -1,4 +1,5 @@
 import os, time, torch, types, pickle
+import logging
 import torch.nn as nn
 from safetensors.torch import load_file
 from transformers import WhisperForConditionalGeneration, WhisperProcessor, Wav2Vec2ForCTC, AutoProcessor, AutoModelForAudioClassification
@@ -13,6 +14,51 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 
 dtype = torch.float16
+
+
+def _as_bool(x) -> bool:
+    if isinstance(x, bool):
+        return x
+    if x is None:
+        return False
+    if isinstance(x, (int, float)):
+        return bool(x)
+    s = str(x).strip().lower()
+    return s in {"1", "true", "yes", "y", "on"}
+
+
+def _debug_infer_enabled(config: dict) -> bool:
+    return _as_bool(os.environ.get("CLD_DEBUG_INFER", "0")) or _as_bool((config or {}).get("debug_infer"))
+
+
+def _get_debug_logger() -> logging.Logger:
+    """
+    Lightweight logger for inference debugging.
+    Enable with env `CLD_DEBUG_INFER=1` or config `{"debug_infer": True}`.
+    Optional: `CLD_DEBUG_INFER_LOGFILE=/path/to/file.log`
+    """
+    logger = logging.getLogger("cld.infer")
+    if logger.handlers:
+        return logger
+
+    logger.setLevel(logging.DEBUG)
+    fmt = logging.Formatter("[%(asctime)s] %(levelname)s %(message)s")
+    logfile = os.environ.get("CLD_DEBUG_INFER_LOGFILE")
+    if logfile:
+        try:
+            fh = logging.FileHandler(logfile)
+            fh.setFormatter(fmt)
+            fh.setLevel(logging.DEBUG)
+            logger.addHandler(fh)
+        except Exception:
+            # Fall back to stderr if file handler can't be created.
+            pass
+    if not logger.handlers:
+        sh = logging.StreamHandler()
+        sh.setFormatter(fmt)
+        sh.setLevel(logging.DEBUG)
+        logger.addHandler(sh)
+    return logger
 
 ISO2_TO_ISO3 = {
     "en": "eng",
@@ -120,6 +166,24 @@ def whisper_custom_retrieve_init_tokens_creator(asr_model, languages):
         init_tokens_tensor = torch.tensor(init_tokens, 
                                           dtype=torch.long, 
                                           device=input_features.device)
+
+        if _debug_infer_enabled(getattr(asr_model, "config", {}) or {}):
+            logger = _get_debug_logger()
+            try:
+                logger.debug(
+                    "Whisper init-tokens | batch_size=%s | class_ids=%s | chosen_langs=%s | lang_token_ids=%s | init_tokens(first)=%s",
+                    batch_size,
+                    list(map(int, class_ids)) if isinstance(class_ids, (list, tuple, np.ndarray)) else class_ids,
+                    chosen_langs,
+                    lang_tokens,
+                    init_tokens[0] if init_tokens else None,
+                )
+                # Also log the vocabulary tokens for the first example if possible.
+                if lang_tokens:
+                    tok = self.generation_config.lang_to_id
+                    _ = tok.get(f"<|{chosen_langs[0]}|>")
+            except Exception as e:
+                logger.debug("Whisper init-tokens logging failed: %s", e)
         
         return init_tokens_tensor
 
@@ -270,12 +334,55 @@ class Whisper(ASRModel):
         input_features = input_features.to(self.get_device(), dtype=dtype)
 
         self.lang_tokens = []
+        debug = _debug_infer_enabled(self.config or {})
+        logger = _get_debug_logger() if debug else None
+        if debug and logger:
+            try:
+                bsz = int(input_features.shape[0])
+                logger.debug(
+                    "Whisper.predict | bsz=%s | input_features=%s | device=%s | dtype=%s | head=%s | forced_decoder_ids=%s",
+                    bsz,
+                    tuple(input_features.shape),
+                    str(input_features.device),
+                    str(input_features.dtype),
+                    type(self.head).__name__ if self.head is not None else None,
+                    getattr(self.model.config, "forced_decoder_ids", None),
+                )
+                logger.debug("Whisper.predict | config.languages=%s", (self.config or {}).get("languages"))
+            except Exception:
+                pass
+
         predicted_ids = self.model.generate(input_features)
         transcription = self.processor.batch_decode(predicted_ids, skip_special_tokens=True)
-        print(transcription)
-        print(self.lang_tokens)
-        if(self.head is None or getattr(self.head, "SKIP", False)):
+
+        # If we're not using a custom head, infer language via Whisper's vanilla language detection.
+        if self.head is None or getattr(self.head, "SKIP", False):
             self.lang_tokens = self._detect_language_vanilla(input_features)
+
+        if debug and logger:
+            try:
+                # Log a short preview of the decoded output, plus tokens with special tokens to diagnose prompts.
+                with_special = self.processor.batch_decode(predicted_ids, skip_special_tokens=False)
+                max_preview = int(os.environ.get("CLD_DEBUG_INFER_PREVIEW_CHARS", "200"))
+                logger.debug("Whisper.predict | predicted_langs=%s", self.lang_tokens)
+                if len(transcription) > 0:
+                    logger.debug("Whisper.predict | text_preview=%r", transcription[0][:max_preview])
+                if len(with_special) > 0:
+                    logger.debug("Whisper.predict | text_with_special_preview=%r", with_special[0][:max_preview])
+                # Raw token ids (first sample)
+                if hasattr(predicted_ids, "shape") and predicted_ids.shape[0] > 0:
+                    first_ids = predicted_ids[0]
+                    try:
+                        first_ids_list = first_ids[:32].detach().cpu().tolist()
+                    except Exception:
+                        first_ids_list = []
+                    logger.debug("Whisper.predict | token_ids_head=%s", first_ids_list)
+                # If using a custom head, ensure init-token hook actually populated lang tokens.
+                if self.head is not None and not getattr(self.head, "SKIP", False) and len(self.lang_tokens) == 0:
+                    logger.debug("Whisper.predict | WARNING: custom head set but lang_tokens is empty after generate()")
+            except Exception as e:
+                logger.debug("Whisper.predict logging failed: %s", e)
+
         return self.lang_tokens, transcription
     
     def get_dimensions(self):
