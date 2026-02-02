@@ -1,6 +1,6 @@
 ## Convex Low-resource Accent-Robust Language Detection in Speech Recognition
 
-This repository provides the official implementation of **CLD**, a lightweight language-detection module for multilingual ASR. This codebase contains our pip-installable Python package (`cld/`) including our training/benchmark scripts implemented in JAX and optimized via ADMM for high performance in low-resource settings. Simply, the package attaches a small language detection head (Convex NN / small NN / linear SVM) to ASR encoder representations, and use it to select the language token (Whisper) or adapter (MMS) before decoding.
+This repository provides the official implementation of **CLD**, a lightweight language-detection module for multilingual ASR. This codebase contains our pip-installable Python package (`jaxcld/`) including our training/benchmark scripts implemented in JAX and optimized via ADMM for high performance in low-resource settings. Simply, the package attaches a small language detection head (Convex NN / small NN / linear SVM) to ASR encoder representations, and use it to select the language token (Whisper) or adapter (MMS) before decoding.
 
 ![Approach overview](assets/fig_1_2.png)
 
@@ -13,7 +13,7 @@ This repository provides the official implementation of **CLD**, a lightweight l
 <!-- 
 ## What’s in this repo
 
-- **`cld/`**: package with `ASRModel` adapters (Whisper + MMS) and language detection heads
+- **`jaxcld/`**: package with `ASRModel` adapters (Whisper + MMS) and language detection heads
 - **Training scripts**
   - **Whisper fine-tuning**: `train_whisper.py`
   - **Convex head (CVXNN, JAX + ADMM/CRONOS)**: `train_cvxnn.py`
@@ -44,6 +44,12 @@ If you prefer installing from the pinned dependency list instead:
 pip install -r requirements.txt
 ```
 
+## Pip README (package-only)
+
+For the pip/PyPI page we use a separate, minimal README focused only on **using** the `jaxcld` package:
+
+- `README_PIP.md`
+
 ## Using the package
 
 ### Minimal inference example (Whisper)
@@ -51,7 +57,7 @@ pip install -r requirements.txt
 ```python
 import numpy as np
 
-from cld import ASRModel, CVXNNLangDetectHead, NNLangDetectHead, SVMLangDetectHead
+from jaxcld import ASRModel, CVXNNLangDetectHead, NNLangDetectHead, SVMLangDetectHead
 
 # 1) Load the base ASR model
 languages = ["en", "hi", "id", "ms", "zh"]

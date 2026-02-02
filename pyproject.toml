@@ -3,10 +3,10 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cld"
+name = "jaxcld"
 version = "0.1.0"
-description = "CLD: language detection heads for ASR models (Whisper / MMS)"
-readme = "README.md"
+description = "CLD: language detection heads for ASR models"
+readme = "README_PIP.md"
 requires-python = ">=3.9"
 authors = [{ name = "CLD contributors" }]
 license = { text = "MIT" }
@@ -51,5 +51,5 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["cld*"]
+include = ["jaxcld*"]
 
