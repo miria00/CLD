@@ -36,13 +36,13 @@
 
   <style>
     .hf-button {
-      background-color: #FF9D00;
-      border-color: #FF9D00;
+      background-color: #363636;
+      border-color: #363636;
       color: #fff;
     }
     .hf-button:hover {
-      background-color: #e08800;
-      border-color: #e08800;
+      background-color: #1a1a1a;
+      border-color: #1a1a1a;
       color: #fff;
     }
     .hf-button .icon i {
@@ -170,10 +170,10 @@
         <!-- Re-validation notice -->
         <div class="revalidation-notice">
           <strong>&#10003; Re-validated results.</strong>
-          Interestingly, upon re-running our full experimental pipeline with fresh seeds prior to the public release of
-          pre-trained checkpoints on HuggingFace, the reported metrics were found to be conservative:
-          all re-validated runs produced results slightly stronger than those reported in the published paper.
-          This provides additional confidence to the robustness and reproducibility of the CLD method.
+          Upon re-running our full experimental pipeline with fresh seeds prior to the public release of
+          pre-trained checkpoints on Hugging Face, the reported metrics were found to be conservative:
+          all re-validated runs produced results equal to or stronger than those reported in the published paper,
+          lending additional confidence to the robustness and reproducibility of the CLD approach.
         </div>
 
         <h2 class="subtitle has-text-centered">
@@ -347,7 +347,7 @@ print(pred_langs[0], pred_texts[0])</code></pre>
             <p>
               Trained convex heads are published on the
               <a href="https://huggingface.co/papers/2605.23235" target="_blank">Hugging Face Hub</a>.
-              Each checkpoint is a serialised <code>CVXNNLangDetectHead</code> (<code>model.pkl</code>) that pairs
+              Each checkpoint includes a  <code>CVXNNLangDetectHead</code> (<code>model.pkl</code>) that pairs
               with its corresponding frozen ASR backbone. All models load in a single line via
               <code>hf_hub_download</code>.
             </p>
