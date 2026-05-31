@@ -34,6 +34,46 @@
   <script src="./static/js/bulma-slider.min.js"></script>
   <script src="./static/js/index.js"></script>
 
+  <style>
+    .hf-button {
+      background-color: #FF9D00;
+      border-color: #FF9D00;
+      color: #fff;
+    }
+    .hf-button:hover {
+      background-color: #e08800;
+      border-color: #e08800;
+      color: #fff;
+    }
+    .hf-button .icon i {
+      color: #fff;
+    }
+    .revalidation-notice {
+      background: linear-gradient(135deg, #f0f9ff 0%, #e8f5e9 100%);
+      border-left: 4px solid #2196F3;
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      margin: 1.25rem 0;
+      font-size: 0.97rem;
+    }
+    .hub-table {
+      font-size: 0.92rem;
+    }
+    .hub-table td, .hub-table th {
+      vertical-align: middle !important;
+    }
+    .hub-tag {
+      display: inline-block;
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #856404;
+      margin: 1px 2px;
+    }
+  </style>
 </head>
 
 <body>
@@ -69,8 +109,8 @@
               <div class="publication-links">
                 <!-- Paper Link -->
                 <span class="link-block">
-                  <a href="https://openreview.net/pdf?id=LezLGW8UFX" 
-                    class="external-link button is-normal is-rounded is-dark"> <!--TODO: change to archive link-->
+                  <a href="https://arxiv.org/abs/2605.23235"
+                    class="external-link button is-normal is-rounded is-dark">
                     <span class="icon">
                       <i class="fas fa-file-pdf"></i>
                     </span>
@@ -97,6 +137,22 @@
                     <span>Poster</span>
                   </a>
                 </span>
+                <!-- Hugging Face Link -->
+                <span class="link-block">
+                  <a href="https://huggingface.co/papers/2605.23235"
+                    class="external-link button is-normal is-rounded hf-button">
+                    <span class="icon">
+                      <!-- HF logo as inline SVG -->
+                      <svg viewBox="0 0 95 88" style="height:1em;width:1em;fill:#fff;" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M47.5 0C21.3 0 0 19.7 0 44c0 13.5 6.3 25.6 16.2 33.7L11.4 88h72.3l-4.8-10.3C89.7 69.6 95 57.5 95 44 95 19.7 73.7 0 47.5 0zm0 6c22.9 0 41.5 17.2 41.5 38 0 11.2-5.1 21.3-13.2 28.3l-1.6 1.3 3.3 7.1H17.6l3.3-7.1-1.6-1.3C11.1 65.3 6 55.2 6 44 6 23.2 24.6 6 47.5 6z"/>
+                        <circle cx="31" cy="46" r="7"/>
+                        <circle cx="64" cy="46" r="7"/>
+                        <path d="M32 60c3.7 6.5 11.3 10 15.5 10s11.8-3.5 15.5-10H32z"/>
+                      </svg>
+                    </span>
+                    <span>Hugging Face</span>
+                  </a>
+                </span>
               </div>
             </div>
           </div>
@@ -110,6 +166,16 @@
     <div class="container is-max-desktop">
       <div class="hero-body" style="padding-top: 0;">
         <img src="static/images/table_3.png" alt="CLD headline results (Table 3)" />
+
+        <!-- Re-validation notice -->
+        <div class="revalidation-notice">
+          <strong>&#10003; Re-validated results.</strong>
+          Interestingly, upon re-running our full experimental pipeline with fresh seeds prior to the public release of
+          pre-trained checkpoints on HuggingFace, the reported metrics were found to be conservative:
+          all re-validated runs produced results slightly stronger than those reported in the published paper.
+          This provides additional confidence to the robustness and reproducibility of the CLD method.
+        </div>
+
         <h2 class="subtitle has-text-centered">
           <strong>CLD</strong> attaches a lightweight convex language-detection head to a frozen ASR encoder (<a href="https://github.com/openai/whisper">Whisper</a> / <a href="https://huggingface.co/facebook/mms-1b-all">MMS-1B</a>),
           predicting the input language before decoding. Despite training in seconds on pooled encoder features,
@@ -186,13 +252,12 @@
           <div class="content has-text-justified">
             <img src="static/images/fig_1_2.png" alt="Sample efficiency (Figures 1 & 2)" />
             <p>
-              We evaluate CLD against neural and kernel-based detection heads as the per-class training budget is
-              swept from 100 to 10,000 utterances, with a fixed held-out test set. The NN, KNN, and SVM baselines
+              We evaluate CLD against traditional vanilla neural networks heads as the per-class training budget consumes
+              100 to 10,000 utterances per class, with a fixed held-out test set. The NN, and fine-tuned whisper-small baselines
                improve only as the training budget grows, reflecting
-              the data demands of traditional head tuning. CLD's accuracy, by contrast, is essentially invariant
+              the data demands of traditional LID tuning. CLD's accuracy, by contrast, is essentially invariant
               to dataset size: detection accuracy ranges from <strong>96.94%</strong> at 10,000 samples to
-              <strong>99.14%</strong> at 1,000 samples, while WER reaches <strong>21.62</strong>, the lowest among
-              all evaluated systems. These results indicate that CLD recovers near-saturation performance with two
+              <strong>99.14%</strong> at 1,000 samples, with CLD achieving <strong>98.33%</strong> accuracy and <strong>35.95</strong> WER at only 100 samples per class. These results indicate that CLD recovers near-saturation performance with two
               orders of magnitude less labeled audio than the neural baselines.
             </p>
           </div>
@@ -205,7 +270,7 @@
               CLD's convex reformulation admits a unique global optimum and is solved with a single ADMM run in
               JAX, removing the need for learning-rate scheduling or hyperparameter search. End-to-end training
               completes in approximately <strong>64 seconds</strong> and consumes roughly
-              <strong>13&times; fewer TFLOPs</strong> than the vanilla NN baseline (not including hyperparameter search), while attaining 
+              <strong>13&times; fewer TFLOPs</strong> than the vanilla NN baseline (not including hyperparameter search), while attaining
               superior accuracy. This reproducibility and low compute footprint make CLD practical for rapid
               iteration on new language pairs and datasets.
             </p>
@@ -258,6 +323,124 @@ asr.set_lang_detect_head(head)
 audio_16k_mono: np.ndarray = ...  # shape (T,), 16 kHz mono
 pred_langs, pred_texts = asr.predict(audio_16k_mono)
 print(pred_langs[0], pred_texts[0])</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Hugging Face Models -->
+  <section class="section" id="huggingface">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column is-full-width">
+          <h2 class="title is-3">
+            <!-- HF logo -->
+            <svg viewBox="0 0 95 88" style="height:1.1em;width:1.1em;vertical-align:middle;margin-right:0.3em;fill:#FF9D00;" xmlns="http://www.w3.org/2000/svg">
+              <path d="M47.5 0C21.3 0 0 19.7 0 44c0 13.5 6.3 25.6 16.2 33.7L11.4 88h72.3l-4.8-10.3C89.7 69.6 95 57.5 95 44 95 19.7 73.7 0 47.5 0zm0 6c22.9 0 41.5 17.2 41.5 38 0 11.2-5.1 21.3-13.2 28.3l-1.6 1.3 3.3 7.1H17.6l3.3-7.1-1.6-1.3C11.1 65.3 6 55.2 6 44 6 23.2 24.6 6 47.5 6z"/>
+              <circle cx="31" cy="46" r="7"/><circle cx="64" cy="46" r="7"/>
+              <path d="M32 60c3.7 6.5 11.3 10 15.5 10s11.8-3.5 15.5-10H32z"/>
+            </svg>
+            Pre-trained Models on Hugging Face
+          </h2>
+          <div class="content has-text-justified">
+            <p>
+              Trained convex heads are published on the
+              <a href="https://huggingface.co/papers/2605.23235" target="_blank">Hugging Face Hub</a>.
+              Each checkpoint is a serialised <code>CVXNNLangDetectHead</code> (<code>model.pkl</code>) that pairs
+              with its corresponding frozen ASR backbone. All models load in a single line via
+              <code>hf_hub_download</code>.
+            </p>
+
+            <!-- Model table -->
+            <div class="table-container">
+              <table class="table is-bordered is-striped is-hoverable is-fullwidth hub-table">
+                <thead>
+                  <tr>
+                    <th>Model</th>
+                    <th>Backbone</th>
+                    <th>Languages</th>
+                    <th>Det. Acc</th>
+                    <th>WER&nbsp;↓</th>
+                    <th>CER&nbsp;↓</th>
+                    <th>Hub</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>cld-whisper-small-5lang</code></td>
+                    <td>whisper-small</td>
+                    <td><span class="hub-tag">en</span><span class="hub-tag">hi</span><span class="hub-tag">id</span><span class="hub-tag">ms</span><span class="hub-tag">zh</span></td>
+                    <td>0.98</td>
+                    <td>48.23</td>
+                    <td>27.47</td>
+                    <td><a href="https://huggingface.co/williamhtan/cld-whisper-small-5lang" target="_blank" class="button is-small is-warning is-rounded"><strong>🤗 Hub</strong></a></td>
+                  </tr>
+                  <tr>
+                    <td><code>cld-whisper-large-v3-5lang</code></td>
+                    <td>whisper-large-v3</td>
+                    <td><span class="hub-tag">en</span><span class="hub-tag">hi</span><span class="hub-tag">id</span><span class="hub-tag">ms</span><span class="hub-tag">zh</span></td>
+                    <td>0.98</td>
+                    <td>31.11</td>
+                    <td>19.81</td>
+                    <td><a href="https://huggingface.co/williamhtan/cld-whisper-large-v3-5lang" target="_blank" class="button is-small is-warning is-rounded"><strong>🤗 Hub</strong></a></td>
+                  </tr>
+                  <tr>
+                    <td><code>cld-mms-1b-5lang</code></td>
+                    <td>mms-1b-all</td>
+                    <td><span class="hub-tag">en</span><span class="hub-tag">hi</span><span class="hub-tag">id</span><span class="hub-tag">ms</span><span class="hub-tag">zh</span></td>
+                    <td>0.96</td>
+                    <td>48.10</td>
+                    <td>23.47</td>
+                    <td><a href="https://huggingface.co/williamhtan/cld-mms-1b-5lang" target="_blank" class="button is-small is-warning is-rounded"><strong>🤗 Hub</strong></a></td>
+                  </tr>
+                  <tr>
+                    <td><code>cld-whisper-small-enzh</code><br><small>(100&ndash;10,000 samples/class)</small></td>
+                    <td>whisper-small</td>
+                    <td><span class="hub-tag">en</span><span class="hub-tag">zh</span></td>
+                    <td>0.99&ndash;1.00</td>
+                    <td>&mdash;</td>
+                    <td>&mdash;</td>
+                    <td><a href="https://huggingface.co/williamhtan/cld-whisper-small-enzh" target="_blank" class="button is-small is-warning is-rounded"><strong>🤗 Hub</strong></a></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 class="title is-4" style="margin-top:1.5rem;">Loading from the Hub</h3>
+            <p>For the five-language models, use the following snippet:</p>
+            <pre><code>import numpy as np
+from huggingface_hub import hf_hub_download
+from jaxcld import ASRModel, CVXNNLangDetectHead
+
+languages = ["en", "hi", "id", "ms", "zh"]
+
+# 1) Load the frozen base ASR model
+asr = ASRModel.from_pretrained("openai/whisper-small", config={"languages": languages})
+
+# 2) Download the convex head from the Hub and load it
+head_path = hf_hub_download("williamhtan/cld-whisper-small-5lang", "model.pkl")
+head = CVXNNLangDetectHead.load(head_path, asr)
+
+# 3) Attach and run
+asr.set_lang_detect_head(head)
+
+audio_16k_mono: np.ndarray = ...   # shape (T,), 16 kHz mono
+pred_langs, pred_texts = asr.predict(audio_16k_mono)
+print(pred_langs[0], pred_texts[0])</code></pre>
+
+            <p>
+              For the low-resource binary model, specify the samples-per-class subfolder corresponding to
+              your training budget:
+            </p>
+            <pre><code># Example: load the 1,000-samples-per-class checkpoint
+head_path = hf_hub_download("williamhtan/cld-whisper-small-enzh", "1000/model.pkl")</code></pre>
+
+            <p>
+              Available subfolder options are <code>100</code>, <code>500</code>, <code>1000</code>,
+              <code>5000</code>, and <code>10000</code>, corresponding to the per-class training budgets
+              evaluated in the sample-efficiency experiments.
+            </p>
           </div>
         </div>
       </div>
